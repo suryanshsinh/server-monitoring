@@ -1,0 +1,36 @@
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# .NET
+**/bin/
+**/obj/
+*.dll
+*.pdb
+
+# Node.js
+node_modules/
+dist/
+.angular/
+
+# Environment
+.env
+*.local
+
+# SSH Keys
+ssh-keys/
+
+# Cloudflare Tunnel
+cloudflared/config.yml
+cloudflared/credentials.json
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

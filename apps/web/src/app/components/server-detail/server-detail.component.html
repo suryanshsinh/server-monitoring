@@ -1,0 +1,171 @@
+<div class="space-y-6">
+  <div class="flex items-center gap-4">
+    <a routerLink="/" class="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+      <svg class="w-5 h-5 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+    @if (server) {
+      <div class="flex-1">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-slate-900 dark:text-white">{{ server.name }}</h1>
+          <span class="status-badge" [ngClass]="getStatusClass(server.currentHealth?.status)">
+            {{ getStatusLabel(server.currentHealth?.status) }}
+          </span>
+        </div>
+        <p class="text-slate-500 dark:text-slate-400">{{ server.host }}:{{ server.port }}</p>
+      </div>
+      <a [routerLink]="['/manage']" [queryParams]="{edit: server.id}" class="btn btn-secondary">
+        Edit Server
+      </a>
+    }
+  </div>
+
+  @if (loading) {
+    <div class="flex items-center justify-center py-20">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+    </div>
+  }
+
+  @if (error) {
+    <div class="card bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+      <div class="flex items-center gap-3 text-red-700 dark:text-red-400">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span>{{ error }}</span>
+      </div>
+    </div>
+  }
+
+  @if (!loading && !error && server) {
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="card">
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">CPU Usage</p>
+        <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">
+          {{ server.currentHealth?.cpuPercent | number:'1.1-1' }}%
+        </p>
+      </div>
+      <div class="card">
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Memory Usage</p>
+        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">
+          {{ server.currentHealth?.memoryPercent | number:'1.1-1' }}%
+        </p>
+      </div>
+      <div class="card">
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Memory Used</p>
+        <p class="text-3xl font-bold text-slate-800 dark:text-white">
+          {{ formatMemory(server.currentHealth?.memoryUsedMb || 0) }}
+        </p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">of {{ formatMemory(server.currentHealth?.memoryTotalMb || 0) }}</p>
+      </div>
+      <div class="card">
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Services</p>
+        <p class="text-3xl font-bold text-slate-800 dark:text-white">
+          {{ services.length }}
+        </p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">monitored</p>
+      </div>
+    </div>
+
+    <div class="flex gap-2">
+      <button (click)="selectRange('1h')" 
+              [class.bg-blue-500]="selectedRange === '1h'"
+              [class.text-white]="selectedRange === '1h'"
+              [class.bg-slate-200]="selectedRange !== '1h'"
+              [class.dark:bg-slate-700]="selectedRange !== '1h'"
+              [class.dark:text-slate-300]="selectedRange !== '1h'"
+              class="px-4 py-2 rounded-lg font-medium transition-colors">
+        1 Hour
+      </button>
+      <button (click)="selectRange('24h')" 
+              [class.bg-blue-500]="selectedRange === '24h'"
+              [class.text-white]="selectedRange === '24h'"
+              [class.bg-slate-200]="selectedRange !== '24h'"
+              [class.dark:bg-slate-700]="selectedRange !== '24h'"
+              [class.dark:text-slate-300]="selectedRange !== '24h'"
+              class="px-4 py-2 rounded-lg font-medium transition-colors">
+        24 Hours
+      </button>
+      <button (click)="selectRange('7d')" 
+              [class.bg-blue-500]="selectedRange === '7d'"
+              [class.text-white]="selectedRange === '7d'"
+              [class.bg-slate-200]="selectedRange !== '7d'"
+              [class.dark:bg-slate-700]="selectedRange !== '7d'"
+              [class.dark:text-slate-300]="selectedRange !== '7d'"
+              class="px-4 py-2 rounded-lg font-medium transition-colors">
+        7 Days
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-4">CPU Usage</h3>
+        <div class="h-64">
+          <canvas #cpuChart></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-4">Memory Usage</h3>
+        <div class="h-64">
+          <canvas #memoryChart></canvas>
+        </div>
+      </div>
+    </div>
+
+    @if (services.length > 0) {
+      <div class="card">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-4">Monitored Services</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-slate-200 dark:border-slate-700">
+                <th class="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Service Name</th>
+                <th class="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Status</th>
+                <th class="text-left py-3 px-4 text-sm font-medium text-slate-600 dark:text-slate-400">Last Checked</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (service of services; track service.id) {
+                <tr class="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                  <td class="py-3 px-4">
+                    <span class="font-medium text-slate-800 dark:text-white">{{ service.serviceName }}</span>
+                  </td>
+                  <td class="py-3 px-4">
+                    @if (service.isRunning) {
+                      <span class="inline-flex items-center gap-1.5 text-green-700 dark:text-green-400">
+                        <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Running
+                      </span>
+                    } @else {
+                      <span class="inline-flex items-center gap-1.5 text-red-700 dark:text-red-400">
+                        <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                        {{ service.status }}
+                      </span>
+                    }
+                  </td>
+                  <td class="py-3 px-4 text-sm text-slate-500 dark:text-slate-400">
+                    {{ service.timestamp | date:'medium' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    @if (server.monitoredServices.length > 0 && services.length === 0) {
+      <div class="card">
+        <h3 class="text-lg font-semibold text-slate-800 dark:text-white mb-4">Monitored Services</h3>
+        <p class="text-slate-500 dark:text-slate-400">Waiting for service status data...</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          @for (svc of server.monitoredServices; track svc) {
+            <span class="px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full text-sm">{{ svc }}</span>
+          }
+        </div>
+      </div>
+    }
+  }
+</div>

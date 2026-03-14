@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: monitor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: monitor9171
+      POSTGRES_DB: monitor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor -d monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/suryanshsinh/monitor-api:latest
+    container_name: monitor-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=monitor;Username=monitor;Password=monitor9171
+      - MetricCollection__IntervalSeconds=5
+      - MetricCollection__SshKeyBasePath=/app/ssh-keys
+    ports:
+      - "127.0.0.1:5000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ssh_keys:/app/ssh-keys
+    networks:
+      - internal
+
+  web:
+    image: ghcr.io/suryanshsinh/monitor-web:latest
+    container_name: monitor-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4200:80"
+    depends_on:
+      - api
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: monitor-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflared/credentials.json:/etc/cloudflared/credentials.json:ro
+    networks:
+      - internal
+    depends_on:
+      - web
+      - api
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  ssh_keys:
